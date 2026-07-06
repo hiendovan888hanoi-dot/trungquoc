@@ -20,7 +20,15 @@ BASE_API = "https://app.filmworx.cn/api/app"
 # ================= CẤU HÌNH CỦA BẠN =================
 # Cứ mỗi khi token hết hạn, ông sửa trực tiếp trên file này nhé!
 DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjIyNzIzNDksIm5ld191aWQiOjMyMTQwNzAsInBob25lIjoiMTg2NDY3MzQ2NjQiLCJhY2NvdW50X2lkIjoxOTMzMTIyOCwiZXhwIjoxNzQ1NjUxNTg4LCJtdGltZSI6MTcyOTgyOTYwNSwibmF0aW9uX2NvZGUiOiI4NiIsImxhbmciOiJ6aC1jbiJ9.N0K5D3LqKj_HtwpQ28kI1tU3yL4R7Y6j0-tJ1W7WqWg"
-USER_ID = 22704695
+def get_user_id(token):
+    try:
+        import base64, json
+        payload = token.split('.')[1]
+        payload += '=' * ((4 - len(payload) % 4) % 4)
+        return json.loads(base64.urlsafe_b64decode(payload)).get('uid', 2272349)
+    except: return 2272349
+
+USER_ID = get_user_id(DEFAULT_TOKEN)
 # ====================================================
 
 if "view_mode" not in st.session_state:
