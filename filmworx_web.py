@@ -85,9 +85,9 @@ if st.session_state.view_mode == "home":
                         col = cols[i % 4]
                         with col:
                             title = movie.get('title', 'Unknown')
-                            img_path = movie.get('cover', '')
+                            img_path = movie.get('cover_url', '')
                             full_img = img_path if img_path.startswith("http") else f"{IMG_BASE_URL}/{img_path}"
-                            m_id = str(movie.get('series_id', ''))
+                            m_id = str(movie.get('id', ''))
                             
                             st.image(full_img, use_column_width=True)
                             st.markdown(f"**{title}**")
