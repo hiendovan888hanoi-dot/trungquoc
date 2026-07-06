@@ -68,7 +68,15 @@ st.sidebar.title("⚙️ Cấu Hình")
 proxy = st.sidebar.text_input("Proxy Trung Quốc", placeholder="http://ip:port", help="Bắt buộc dùng để lách luật!")
 token = DEFAULT_TOKEN
 
-session = requests.Session()
+if "api_session" not in st.session_state:
+    s = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100)
+    s.mount("http://", adapter)
+    s.mount("https://", adapter)
+    s.trust_env = False  # Bỏ qua system proxy để tránh lag
+    st.session_state.api_session = s
+
+session = st.session_state.api_session
 if proxy:
     session.proxies = {"http": proxy, "https": proxy}
 
