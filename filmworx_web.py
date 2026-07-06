@@ -267,101 +267,101 @@ elif st.session_state.view_mode == "detail":
                         st.stop()
                         
                     st.write(f"Đang tải {len(selected_eps)} tập...")
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                out_dir = f"Downloads_Phim_{m_id}"
-                os.makedirs(out_dir, exist_ok=True)
-                
-                for idx, ep in enumerate(selected_eps):
-                    ep_num = ep.get("episode")
-                    raw_url = ep.get("video_url")
-                    if not raw_url: continue
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
                     
-                    m3u8_url = f"{VOD_BASE_URL}{raw_url if raw_url.startswith('/') else '/'+raw_url}"
-                    out_file = os.path.join(out_dir, f"Tap_{ep_num:03d}.mp4")
+                    out_dir = f"Downloads_Phim_{m_id}"
+                    os.makedirs(out_dir, exist_ok=True)
                     
-                    status_text.text(f"Đang tải Tập {ep_num}...")
-                    
-                    try:
-                        r_ts = session.get(m3u8_url, headers=headers, timeout=30, verify=False)
-                        if r_ts.status_code != 200: continue
-                        text = r_ts.text
+                    for idx, ep in enumerate(selected_eps):
+                        ep_num = ep.get("episode")
+                        raw_url = ep.get("video_url")
+                        if not raw_url: continue
                         
-                        if "#EXT-X-STREAM-INF" in text:
-                            lines = text.splitlines()
-                            best = None; max_bw = -1
-                            for i, l in enumerate(lines):
-                                if l.startswith("#EXT-X-STREAM-INF"):
-                                    bw = int(re.search(r'BANDWIDTH=(\d+)', l).group(1)) if 'BANDWIDTH' in l else 0
-                                    if i+1 < len(lines) and bw > max_bw:
-                                        max_bw = bw; best = lines[i+1].strip()
-                            if best:
-                                m3u8_url = urljoin(m3u8_url, best)
-                                text = session.get(m3u8_url, headers=headers, timeout=30, verify=False).text
-
-                        aes_key = None; aes_iv = None
-                        for line in text.splitlines():
-                            if line.startswith("#EXT-X-KEY:"):
-                                if "METHOD=AES-128" in line:
-                                    uri_match = re.search(r'URI="([^"]+)"', line)
-                                    if uri_match:
-                                        key_url = uri_match.group(1)
-                                        if not key_url.startswith("http"): key_url = urljoin(m3u8_url, key_url)
-                                        key_res = session.get(key_url, headers=headers, timeout=30, verify=False)
-                                        if key_res.status_code == 200: aes_key = key_res.content
-                                    iv_match = re.search(r'IV=0x([0-9a-fA-F]+)', line)
-                                    if iv_match: aes_iv = bytes.fromhex(iv_match.group(1))
-
-                        ts_links = [urljoin(m3u8_url, l.strip()) for l in text.splitlines() if l.strip() and not l.startswith('#')]
-                        if not ts_links: continue
+                        m3u8_url = f"{VOD_BASE_URL}{raw_url if raw_url.startswith('/') else '/'+raw_url}"
+                        out_file = os.path.join(out_dir, f"Tap_{ep_num:03d}.mp4")
                         
-                        def download_ts(i, ts_url, aes_key, aes_iv):
-                            try:
-                                ts_res = session.get(ts_url, headers=headers, timeout=30, verify=False)
-                                if ts_res.status_code == 200:
-                                    data_ts = ts_res.content
-                                    if aes_key:
-                                        try:
-                                            iv = aes_iv if aes_iv else i.to_bytes(16, 'big')
-                                            cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
-                                            data_ts = cipher.decryptor().update(data_ts)
-                                        except: pass
-                                    return data_ts
-                            except: pass
-                            return None
-
-                        import concurrent.futures
-                        with open(out_file, "wb") as f_out:
-                            with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-                                futures = [executor.submit(download_ts, i, url, aes_key, aes_iv) for i, url in enumerate(ts_links)]
-                                for fut in futures:
-                                    data = fut.result()
-                                    if data:
-                                        f_out.write(data)
+                        status_text.text(f"Đang tải Tập {ep_num}...")
                         
-                    except Exception as e:
-                        st.error(f"Lỗi Tập {ep_num}: {e}")
-                    
-                    progress_bar.progress((idx + 1) / len(selected_eps))
-                    
-                if len(selected_eps) == 1:
-                    status_text.text("Đang chuẩn bị file video...")
-                    ep_num = selected_eps[0].get("episode")
-                    single_file_path = os.path.join(out_dir, f"Tap_{ep_num:03d}.mp4")
-                    st.success("Tải hoàn tất!")
-                    with open(single_file_path, "rb") as f:
-                        st.download_button(f"Tải Tập {ep_num} về máy", f, file_name=f"Phim_{m_id}_Tap_{ep_num:03d}.mp4", mime="video/mp4")
-                else:
-                    status_text.text("Đang nén file ZIP...")
-                    zip_path = f"Phim_{m_id}.zip"
-                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                        for root, _, files in os.walk(out_dir):
-                            for file in files:
-                                zipf.write(os.path.join(root, file), arcname=file)
-                                
-                    st.success("Tải hoàn tất!")
-                    with open(zip_path, "rb") as f:
-                        st.download_button("Tải File ZIP về máy", f, file_name=zip_path, mime="application/zip")
+                        try:
+                            r_ts = session.get(m3u8_url, headers=headers, timeout=30, verify=False)
+                            if r_ts.status_code != 200: continue
+                            text = r_ts.text
+                            
+                            if "#EXT-X-STREAM-INF" in text:
+                                lines = text.splitlines()
+                                best = None; max_bw = -1
+                                for i, l in enumerate(lines):
+                                    if l.startswith("#EXT-X-STREAM-INF"):
+                                        bw = int(re.search(r'BANDWIDTH=(\d+)', l).group(1)) if 'BANDWIDTH' in l else 0
+                                        if i+1 < len(lines) and bw > max_bw:
+                                            max_bw = bw; best = lines[i+1].strip()
+                                if best:
+                                    m3u8_url = urljoin(m3u8_url, best)
+                                    text = session.get(m3u8_url, headers=headers, timeout=30, verify=False).text
+    
+                            aes_key = None; aes_iv = None
+                            for line in text.splitlines():
+                                if line.startswith("#EXT-X-KEY:"):
+                                    if "METHOD=AES-128" in line:
+                                        uri_match = re.search(r'URI="([^"]+)"', line)
+                                        if uri_match:
+                                            key_url = uri_match.group(1)
+                                            if not key_url.startswith("http"): key_url = urljoin(m3u8_url, key_url)
+                                            key_res = session.get(key_url, headers=headers, timeout=30, verify=False)
+                                            if key_res.status_code == 200: aes_key = key_res.content
+                                        iv_match = re.search(r'IV=0x([0-9a-fA-F]+)', line)
+                                        if iv_match: aes_iv = bytes.fromhex(iv_match.group(1))
+    
+                            ts_links = [urljoin(m3u8_url, l.strip()) for l in text.splitlines() if l.strip() and not l.startswith('#')]
+                            if not ts_links: continue
+                            
+                            def download_ts(i, ts_url, aes_key, aes_iv):
+                                try:
+                                    ts_res = session.get(ts_url, headers=headers, timeout=30, verify=False)
+                                    if ts_res.status_code == 200:
+                                        data_ts = ts_res.content
+                                        if aes_key:
+                                            try:
+                                                iv = aes_iv if aes_iv else i.to_bytes(16, 'big')
+                                                cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
+                                                data_ts = cipher.decryptor().update(data_ts)
+                                            except: pass
+                                        return data_ts
+                                except: pass
+                                return None
+    
+                            import concurrent.futures
+                            with open(out_file, "wb") as f_out:
+                                with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+                                    futures = [executor.submit(download_ts, i, url, aes_key, aes_iv) for i, url in enumerate(ts_links)]
+                                    for fut in futures:
+                                        data = fut.result()
+                                        if data:
+                                            f_out.write(data)
+                            
+                        except Exception as e:
+                            st.error(f"Lỗi Tập {ep_num}: {e}")
+                        
+                        progress_bar.progress((idx + 1) / len(selected_eps))
+                        
+                    if len(selected_eps) == 1:
+                        status_text.text("Đang chuẩn bị file video...")
+                        ep_num = selected_eps[0].get("episode")
+                        single_file_path = os.path.join(out_dir, f"Tap_{ep_num:03d}.mp4")
+                        st.success("Tải hoàn tất!")
+                        with open(single_file_path, "rb") as f:
+                            st.download_button(f"Tải Tập {ep_num} về máy", f, file_name=f"Phim_{m_id}_Tap_{ep_num:03d}.mp4", mime="video/mp4")
+                    else:
+                        status_text.text("Đang nén file ZIP...")
+                        zip_path = f"Phim_{m_id}.zip"
+                        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                            for root, _, files in os.walk(out_dir):
+                                for file in files:
+                                    zipf.write(os.path.join(root, file), arcname=file)
+                                    
+                        st.success("Tải hoàn tất!")
+                        with open(zip_path, "rb") as f:
+                            st.download_button("Tải File ZIP về máy", f, file_name=zip_path, mime="application/zip")
         except Exception as e:
             st.error(f"Lỗi mạng: {e}")
