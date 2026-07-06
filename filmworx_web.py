@@ -68,8 +68,9 @@ if st.session_state.view_mode == "home":
     with st.spinner("Đang lấy danh sách phim..."):
         try:
             url = f"{BASE_API}/series/list"
-            params = {"page": 1, "page_size": 20}
-            res = session.get(url, params=params, headers=get_guest_headers(), timeout=15, verify=False)
+            params = {"page": 1, "size": 20, "timestamp": int(time.time()), "user_id": USER_ID}
+            params["sign"] = generate_sign(params, USER_ID)
+            res = session.get(url, params=params, headers=get_auth_headers(token), timeout=15, verify=False)
             if res.status_code == 200:
                 data = res.json()
                 if data.get("code") == 0:
@@ -98,7 +99,8 @@ if st.session_state.view_mode == "home":
                                 st.session_state.view_mode = "detail"
                                 st.rerun()
                 else:
-                    st.error(f"Lỗi API: {data.get('message')}")
+                    err_msg = data.get("msg") or data.get("message") or str(data)
+                    st.error(f"Lỗi API: {err_msg}")
             else:
                 st.error("Không thể kết nối đến máy chủ Filmworx. Vui lòng bật Proxy.")
         except Exception as e:
