@@ -251,15 +251,22 @@ elif st.session_state.view_mode == "detail":
                 st.error(f"Lỗi tải tổng số tập: {r_total.get('msg') or str(r_total)}")
                 
             st.markdown("---")
-            ep_range = st.text_input("📥 Chọn tập tải (vd: 1-5, hoặc để trống sẽ tải toàn bộ batch đang hiển thị ở trên)", placeholder="Ví dụ: 1-5")
-            
-            if st.button("Bắt đầu Tải & Nén ZIP", type="primary"):
-                selected_eps = batch_eps
-                if ep_range and "-" in ep_range:
-                    s, e = map(int, ep_range.split("-"))
-                    selected_eps = [ep for ep in batch_eps if s <= ep.get("episode", 0) <= e]
-                    
-                st.write(f"Đang tải {len(selected_eps)} tập...")
+            st.subheader("📥 Tải Phim")
+            if 'batch_eps' in locals() and batch_eps:
+                options = [f"Tập {ep.get('episode')}" for ep in batch_eps]
+                selected_ep_names = st.multiselect(
+                    "Chọn các tập muốn tải (mặc định chọn tất cả trang này):", 
+                    options=options, 
+                    default=options
+                )
+                
+                if st.button("Bắt đầu Tải & Nén ZIP", type="primary"):
+                    selected_eps = [ep for ep in batch_eps if f"Tập {ep.get('episode')}" in selected_ep_names]
+                    if not selected_eps:
+                        st.warning("Vui lòng chọn ít nhất 1 tập để tải!")
+                        st.stop()
+                        
+                    st.write(f"Đang tải {len(selected_eps)} tập...")
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
