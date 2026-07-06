@@ -118,11 +118,11 @@ elif st.session_state.view_mode == "detail":
     with st.spinner("Đang lấy danh sách tập..."):
         headers = get_auth_headers(token)
         try:
-            params = {"series_id": int(m_id), "page": 1, "size": 200, "timestamp": int(time.time()), "user_id": USER_ID}
+            params = {"series_id": int(m_id), "start_episode": 1, "end_episode": 500, "timestamp": int(time.time()), "user_id": USER_ID}
             params["sign"] = generate_sign(params, USER_ID)
             r = session.get(f"{BASE_API}/video/v2/list", params=params, headers=headers, timeout=30, verify=False).json()
             
-            if r.get("code") == 0 and "data" in r:
+            if r.get("code") in [0, 200] and "data" in r:
                 eps = r["data"].get("list", [])
                 st.info(f"Tìm thấy {len(eps)} tập.")
                 
