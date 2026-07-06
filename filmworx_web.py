@@ -14,14 +14,15 @@ except ImportError:
 st.set_page_config(page_title="Filmworx Downloader Web", page_icon="🎬", layout="wide")
 
 st.markdown("""
+
 <style>
-    /* Fade-in Animation for the whole page */
-    @keyframes fadeIn {
-        0% { opacity: 0; transform: translateY(10px); }
+    /* Hiệu ứng Fade-in nhanh (0.3s) để không gây cảm giác đơ */
+    @keyframes fadeInFast {
+        0% { opacity: 0; transform: translateY(5px); }
         100% { opacity: 1; transform: translateY(0); }
     }
     .block-container {
-        animation: fadeIn 0.6s ease-out;
+        animation: fadeInFast 0.3s ease-out;
     }
     
     /* Hover effects for Movie Images */
@@ -100,6 +101,13 @@ def get_auth_headers(token=DEFAULT_TOKEN):
         "Authorization": f"Bearer {token.strip()}" if token else "",
         "Host": "app.filmworx.cn"
     }
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_cached_api(url, params, _headers):
+    # Dùng _headers để tránh Streamlit hash lỗi dictionary
+    import requests
+    return requests.get(url, params=params, headers=_headers, timeout=30, verify=False).json()
 
 def get_guest_headers():
     return {
@@ -184,7 +192,7 @@ elif st.session_state.view_mode == "detail":
             # 1. Lấy tổng số tập phim
             total_eps_params = {"series_id": int(m_id)}
             total_eps_params["sign"] = generate_sign(total_eps_params, USER_ID)
-            r_total = session.get(f"{BASE_API}/video/total_episodes", params=total_eps_params, headers=headers, timeout=30, verify=False).json()
+            r_total = fetch_cached_api(f"{BASE_API}/video/total_episodes", total_eps_params, headers)
             
             if r_total.get("code") == 200:
                 total_episodes = r_total.get("data", {}).get("total_episodes", 0)
@@ -192,7 +200,7 @@ elif st.session_state.view_mode == "detail":
                 # Lấy thêm thông tin giờ cập nhật
                 detail_params = {"timestamp": int(time.time()), "user_id": USER_ID}
                 detail_params["sign"] = generate_sign(detail_params, USER_ID)
-                r_detail = session.get(f"{BASE_API}/series/detail/{m_id}", params=detail_params, headers=headers, timeout=30, verify=False).json()
+                r_detail = fetch_cached_api(f"{BASE_API}/series/detail/{m_id}", detail_params, headers)
                 update_time = r_detail.get("data", {}).get("daily_update_time", "N/A") if r_detail.get("code") == 200 else "N/A"
                 
                 st.info(f"Tổng cộng: {total_episodes} tập | Giờ cập nhật: {update_time}")
@@ -216,7 +224,7 @@ elif st.session_state.view_mode == "detail":
                     # 2. Gọi API lấy đúng danh sách tập của trang hiện tại
                     list_params = {"series_id": int(m_id), "start_episode": start_episode, "end_episode": end_episode}
                     list_params["sign"] = generate_sign(list_params, USER_ID)
-                    r_list = session.get(f"{BASE_API}/video/v2/list", params=list_params, headers=headers, timeout=30, verify=False).json()
+                    r_list = fetch_cached_api(f"{BASE_API}/video/v2/list", list_params, headers)
                     
                     if r_list.get("code") in [0, 200] and "data" in r_list:
                         batch_eps = r_list["data"].get("list", [])
@@ -301,9 +309,10 @@ elif st.session_state.view_mode == "detail":
                         ts_links = [urljoin(m3u8_url, l.strip()) for l in text.splitlines() if l.strip() and not l.startswith('#')]
                         if not ts_links: continue
                         
-                        with open(out_file, "wb") as f_out:
-                            for i, ts_url in enumerate(ts_links):
-                                ts_res = session.get(ts_url, headers=headers, timeout=30, verify=False)
+                        def download_ts(i, ts_url, aes_key, aes_iv):
+                            import requests
+                            try:
+                                ts_res = requests.get(ts_url, headers=headers, timeout=30, verify=False)
                                 if ts_res.status_code == 200:
                                     data_ts = ts_res.content
                                     if aes_key:
@@ -312,7 +321,18 @@ elif st.session_state.view_mode == "detail":
                                             cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
                                             data_ts = cipher.decryptor().update(data_ts)
                                         except: pass
-                                    f_out.write(data_ts)
+                                    return data_ts
+                            except: pass
+                            return None
+
+                        import concurrent.futures
+                        with open(out_file, "wb") as f_out:
+                            with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+                                futures = [executor.submit(download_ts, i, url, aes_key, aes_iv) for i, url in enumerate(ts_links)]
+                                for fut in futures:
+                                    data = fut.result()
+                                    if data:
+                                        f_out.write(data)
                         
                     except Exception as e:
                         st.error(f"Lỗi Tập {ep_num}: {e}")
