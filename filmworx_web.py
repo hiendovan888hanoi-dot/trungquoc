@@ -13,6 +13,50 @@ except ImportError:
 
 st.set_page_config(page_title="Filmworx Downloader Web", page_icon="🎬", layout="wide")
 
+st.markdown("""
+<style>
+    /* Fade-in Animation for the whole page */
+    @keyframes fadeIn {
+        0% { opacity: 0; transform: translateY(10px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+    .block-container {
+        animation: fadeIn 0.6s ease-out;
+    }
+    
+    /* Hover effects for Movie Images */
+    div[data-testid="stImage"] img {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border-radius: 8px;
+    }
+    div[data-testid="stImage"] img:hover {
+        transform: scale(1.03);
+        box-shadow: 0 10px 20px rgba(0, 242, 254, 0.2);
+    }
+    
+    /* Progress Bar Animation & Styling */
+    div[data-testid="stProgressBar"] > div > div {
+        background: linear-gradient(90deg, #00f2fe, #4facfe, #00f2fe);
+        background-size: 200% 100%;
+        animation: gradientMove 2s linear infinite;
+        border-radius: 10px;
+    }
+    @keyframes gradientMove {
+        0% { background-position: 100% 0; }
+        100% { background-position: -100% 0; }
+    }
+    
+    /* Button styling (Subtle glow) */
+    button[kind="primary"] {
+        transition: all 0.3s ease;
+    }
+    button[kind="primary"]:hover {
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+        transform: translateY(-2px);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 VOD_BASE_URL = "https://video-file.filmworx.cn"
 IMG_BASE_URL = "https://gnmj-file.filmworx.cn"
 BASE_API = "https://app.filmworx.cn/api/app"
@@ -102,20 +146,21 @@ if st.session_state.view_mode == "home":
                     for i, movie in enumerate(movies):
                         col = cols[i % 4]
                         with col:
-                            title = movie.get('title', 'Unknown')
-                            img_path = movie.get('cover_url', '')
-                            full_img = img_path if img_path.startswith("http") else f"{IMG_BASE_URL}/{img_path}"
-                            m_id = str(movie.get('id', ''))
-                            
-                            st.image(full_img, use_column_width=True)
-                            st.markdown(f"**{title}**")
-                            st.caption(f"ID: {m_id}")
-                            
-                            if st.button(f"Tải phim này", key=f"btn_{m_id}"):
-                                st.session_state.selected_movie_id = m_id
-                                st.session_state.selected_movie_title = title
-                                st.session_state.view_mode = "detail"
-                                st.rerun()
+                            with st.container(border=True):
+                                title = movie.get('title', 'Unknown')
+                                img_path = movie.get('cover_url', '')
+                                full_img = img_path if img_path.startswith("http") else f"{IMG_BASE_URL}/{img_path}"
+                                m_id = str(movie.get('id', ''))
+                                
+                                st.image(full_img, use_column_width=True)
+                                st.markdown(f"**{title}**")
+                                st.caption(f"ID: {m_id}")
+                                
+                                if st.button(f"Tải phim này", key=f"btn_{m_id}", use_container_width=True):
+                                    st.session_state.selected_movie_id = m_id
+                                    st.session_state.selected_movie_title = title
+                                    st.session_state.view_mode = "detail"
+                                    st.rerun()
                 else:
                     err_msg = data.get("msg") or data.get("message") or str(data)
                     st.error(f"Lỗi API: {err_msg}")
