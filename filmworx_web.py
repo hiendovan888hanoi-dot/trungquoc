@@ -333,7 +333,7 @@ elif st.session_state.view_mode == "detail":
     
                             import concurrent.futures
                             with open(out_file, "wb") as f_out:
-                                with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+                                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                                     futures = [executor.submit(download_ts, i, url, aes_key, aes_iv) for i, url in enumerate(ts_links)]
                                     for fut in futures:
                                         data = fut.result()
@@ -349,19 +349,27 @@ elif st.session_state.view_mode == "detail":
                         status_text.text("Đang chuẩn bị file video...")
                         ep_num = selected_eps[0].get("episode")
                         single_file_path = os.path.join(out_dir, f"Tap_{ep_num:03d}.mp4")
-                        st.success("Tải hoàn tất!")
-                        with open(single_file_path, "rb") as f:
-                            st.download_button(f"Tải Tập {ep_num} về máy", f, file_name=f"Phim_{m_id}_Tap_{ep_num:03d}.mp4", mime="video/mp4")
+                        if os.path.exists(single_file_path):
+                            st.success("Tải hoàn tất!")
+                            with open(single_file_path, "rb") as f:
+                                st.download_button(f"Tải Tập {ep_num} về máy", f, file_name=f"Phim_{m_id}_Tap_{ep_num:03d}.mp4", mime="video/mp4")
+                        else:
+                            st.error("❌ Không tải được video! (Có thể tập này chưa ra mắt hoặc bị khóa VIP)")
                     else:
                         status_text.text("Đang nén file ZIP...")
                         zip_path = f"Phim_{m_id}.zip"
+                        has_files = False
                         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                             for root, _, files in os.walk(out_dir):
                                 for file in files:
                                     zipf.write(os.path.join(root, file), arcname=file)
+                                    has_files = True
                                     
-                        st.success("Tải hoàn tất!")
-                        with open(zip_path, "rb") as f:
-                            st.download_button("Tải File ZIP về máy", f, file_name=zip_path, mime="application/zip")
+                        if has_files:
+                            st.success("Tải hoàn tất!")
+                            with open(zip_path, "rb") as f:
+                                st.download_button("Tải File ZIP về máy", f, file_name=zip_path, mime="application/zip")
+                        else:
+                            st.error("❌ Không tải được bất kỳ video nào! (Có thể do khóa VIP hoặc lỗi mạng)")
         except Exception as e:
             st.error(f"Lỗi mạng: {e}")
