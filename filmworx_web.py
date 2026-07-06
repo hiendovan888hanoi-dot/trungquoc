@@ -125,49 +125,62 @@ elif st.session_state.view_mode == "detail":
     m_title = st.session_state.selected_movie_title
     st.title(f"📺 Đang chọn: {m_title}")
     
-    with st.spinner("Đang lấy danh sách tập..."):
+    with st.spinner("Đang lấy dữ liệu phim..."):
         headers = get_auth_headers(token)
         try:
-            params = {"series_id": int(m_id), "start_episode": 1, "end_episode": 500, "timestamp": int(time.time()), "user_id": USER_ID}
-            params["sign"] = generate_sign(params, USER_ID)
-            r = session.get(f"{BASE_API}/video/v2/list", params=params, headers=headers, timeout=30, verify=False).json()
+            # 1. Lấy tổng số tập phim
+            total_eps_params = {"series_id": int(m_id)}
+            total_eps_params["sign"] = generate_sign(total_eps_params, USER_ID)
+            r_total = session.get(f"{BASE_API}/video/total_episodes", params=total_eps_params, headers=headers, timeout=30, verify=False).json()
             
-            if r.get("code") in [0, 200] and "data" in r:
-                eps = r["data"].get("list", [])
+            if r_total.get("code") == 200:
+                total_episodes = r_total.get("data", {}).get("total_episodes", 0)
+                st.info(f"Tổng cộng có {total_episodes} tập.")
                 
-                if eps:
-                    # Sắp xếp lại danh sách từ tập 1 -> N (vì API đôi khi trả về ngược từ N -> 1)
-                    eps = sorted(eps, key=lambda x: x.get("episode", 0))
-                    st.info(f"Tìm thấy {len(eps)} tập.")
+                batch_eps = []
+                if total_episodes > 0:
+                    # Chia thành các batch (mỗi batch 30 tập giống bản Python GUI)
+                    batch_size = 30
+                    total_batches = (total_episodes + batch_size - 1) // batch_size
                     
-                    # Chia thành các batch (mỗi batch 15 tập)
-                    batch_size = 15
-                    total_batches = (len(eps) + batch_size - 1) // batch_size
-                    if total_batches > 0:
-                        batch_options = [f"Tập {i*batch_size + 1} - {min((i+1)*batch_size, len(eps))}" for i in range(total_batches)]
+                    batch_options = [f"Tập {i*batch_size + 1} - {min((i+1)*batch_size, total_episodes)}" for i in range(total_batches)]
+                    
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
+                        selected_batch = st.selectbox("Hiển thị danh sách:", batch_options)
+                    
+                    batch_idx = batch_options.index(selected_batch)
+                    start_episode = batch_idx * batch_size + 1
+                    end_episode = min((batch_idx + 1) * batch_size, total_episodes)
+                    
+                    # 2. Gọi API lấy đúng danh sách tập của trang hiện tại
+                    list_params = {"series_id": int(m_id), "start_episode": start_episode, "end_episode": end_episode}
+                    list_params["sign"] = generate_sign(list_params, USER_ID)
+                    r_list = session.get(f"{BASE_API}/video/v2/list", params=list_params, headers=headers, timeout=30, verify=False).json()
+                    
+                    if r_list.get("code") in [0, 200] and "data" in r_list:
+                        batch_eps = r_list["data"].get("list", [])
                         
-                        col1, col2 = st.columns([1, 2])
-                        with col1:
-                            selected_batch = st.selectbox("Hiển thị danh sách:", batch_options)
-                        
-                        batch_idx = batch_options.index(selected_batch)
-                        start_idx = batch_idx * batch_size
-                        end_idx = min((batch_idx + 1) * batch_size, len(eps))
-                        
-                        batch_eps = eps[start_idx:end_idx]
-                        
-                        # Tạo bảng danh sách tập để người dùng copy nếu muốn
-                        import pandas as pd
-                        df = pd.DataFrame([
-                            {
-                                "Tập": ep.get("episode", start_idx+i+1), 
-                                "Link M3U8": f"{VOD_BASE_URL}{ep.get('video_url', '')}" if ep.get("video_url") else "N/A"
-                            } 
-                            for i, ep in enumerate(batch_eps)
-                        ])
-                        st.dataframe(df, use_container_width=True, hide_index=True)
-                else:
-                    st.warning("Không lấy được tập phim nào. Hãy thử tải lại trang.")
+                        if batch_eps:
+                            # Sắp xếp lại danh sách từ tập 1 -> N (vì API đôi khi trả về ngược)
+                            batch_eps = sorted(batch_eps, key=lambda x: x.get("episode", 0))
+                            
+                            # Tạo bảng danh sách tập
+                            import pandas as pd
+                            df = pd.DataFrame([
+                                {
+                                    "Tập": ep.get("episode"), 
+                                    "Link M3U8": f"{VOD_BASE_URL}{ep.get('video_url', '')}" if ep.get("video_url") else "N/A"
+                                } 
+                                for ep in batch_eps
+                            ])
+                            st.dataframe(df, use_container_width=True, hide_index=True)
+                        else:
+                            st.warning("Trang này không có tập phim nào. Hãy thử chọn trang khác.")
+                    else:
+                        st.error(f"Lỗi tải danh sách tập: {r_list.get('msg') or str(r_list)}")
+            else:
+                st.error(f"Lỗi tải tổng số tập: {r_total.get('msg') or str(r_total)}")
                 
                 st.markdown("---")
                 ep_range = st.text_input("📥 Chọn tập tải (vd: 1-5, hoặc để trống sẽ tải toàn bộ batch đang hiển thị ở trên)", placeholder="Ví dụ: 1-5")
@@ -176,7 +189,7 @@ elif st.session_state.view_mode == "detail":
                     selected_eps = batch_eps
                     if ep_range and "-" in ep_range:
                         s, e = map(int, ep_range.split("-"))
-                        selected_eps = [ep for ep in eps if s <= ep.get("episode", 0) <= e]
+                        selected_eps = [ep for ep in batch_eps if s <= ep.get("episode", 0) <= e]
                         
                     st.write(f"Đang tải {len(selected_eps)} tập...")
                     progress_bar = st.progress(0)
