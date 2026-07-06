@@ -127,16 +127,32 @@ elif st.session_state.view_mode == "detail":
                 st.info(f"Tìm thấy {len(eps)} tập.")
                 
                 if eps:
-                    # Tạo bảng danh sách tập để người dùng copy nếu muốn
-                    import pandas as pd
-                    df = pd.DataFrame([{"Tập": ep.get("episode", i+1), "Link M3U8": ep.get("url", "N/A")} for i, ep in enumerate(eps)])
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    # Chia thành các batch (mỗi batch 15 tập)
+                    batch_size = 15
+                    total_batches = (len(eps) + batch_size - 1) // batch_size
+                    if total_batches > 0:
+                        batch_options = [f"Tập {i*batch_size + 1} - {min((i+1)*batch_size, len(eps))}" for i in range(total_batches)]
+                        
+                        col1, col2 = st.columns([1, 2])
+                        with col1:
+                            selected_batch = st.selectbox("Hiển thị danh sách:", batch_options)
+                        
+                        batch_idx = batch_options.index(selected_batch)
+                        start_idx = batch_idx * batch_size
+                        end_idx = min((batch_idx + 1) * batch_size, len(eps))
+                        
+                        batch_eps = eps[start_idx:end_idx]
+                        
+                        # Tạo bảng danh sách tập để người dùng copy nếu muốn
+                        import pandas as pd
+                        df = pd.DataFrame([{"Tập": ep.get("episode", start_idx+i+1), "Link M3U8": ep.get("url", "N/A")} for i, ep in enumerate(batch_eps)])
+                        st.dataframe(df, use_container_width=True, hide_index=True)
                 
                 st.markdown("---")
-                ep_range = st.text_input("📥 Tải nhiều tập cùng lúc (vd: 1-5, hoặc để trống tải hết)", placeholder="1-5")
+                ep_range = st.text_input("📥 Chọn tập tải (vd: 1-5, hoặc để trống sẽ tải toàn bộ batch đang hiển thị ở trên)", placeholder="Ví dụ: 1-5")
                 
                 if st.button("Bắt đầu Tải & Nén ZIP", type="primary"):
-                    selected_eps = eps
+                    selected_eps = batch_eps
                     if ep_range and "-" in ep_range:
                         s, e = map(int, ep_range.split("-"))
                         selected_eps = [ep for ep in eps if s <= ep.get("episode", 0) <= e]
