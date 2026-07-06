@@ -109,7 +109,7 @@ if st.session_state.view_mode == "home":
                             
                             st.image(full_img, use_column_width=True)
                             st.markdown(f"**{title}**")
-                            st.caption(f"Trạng thái: {movie.get('status', 'N/A')} | Tập: {movie.get('total', 0)}")
+                            st.caption(f"ID: {m_id}")
                             
                             if st.button(f"Tải phim này", key=f"btn_{m_id}"):
                                 st.session_state.selected_movie_id = m_id
@@ -143,7 +143,14 @@ elif st.session_state.view_mode == "detail":
             
             if r_total.get("code") == 200:
                 total_episodes = r_total.get("data", {}).get("total_episodes", 0)
-                st.info(f"Tổng cộng có {total_episodes} tập.")
+                
+                # Lấy thêm thông tin giờ cập nhật
+                detail_params = {"timestamp": int(time.time()), "user_id": USER_ID}
+                detail_params["sign"] = generate_sign(detail_params, USER_ID)
+                r_detail = session.get(f"{BASE_API}/series/detail/{m_id}", params=detail_params, headers=headers, timeout=30, verify=False).json()
+                update_time = r_detail.get("data", {}).get("daily_update_time", "N/A") if r_detail.get("code") == 200 else "N/A"
+                
+                st.info(f"Tổng cộng: {total_episodes} tập | Giờ cập nhật: {update_time}")
                 
                 batch_eps = []
                 if total_episodes > 0:
@@ -267,15 +274,23 @@ elif st.session_state.view_mode == "detail":
                     
                     progress_bar.progress((idx + 1) / len(selected_eps))
                     
-                status_text.text("Đang nén file ZIP...")
-                zip_path = f"Phim_{m_id}.zip"
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    for root, _, files in os.walk(out_dir):
-                        for file in files:
-                            zipf.write(os.path.join(root, file), arcname=file)
-                            
-                st.success("Tải hoàn tất!")
-                with open(zip_path, "rb") as f:
-                    st.download_button("Tải File ZIP về máy", f, file_name=zip_path, mime="application/zip")
+                if len(selected_eps) == 1:
+                    status_text.text("Đang chuẩn bị file video...")
+                    ep_num = selected_eps[0].get("episode")
+                    single_file_path = os.path.join(out_dir, f"Tap_{ep_num:03d}.mp4")
+                    st.success("Tải hoàn tất!")
+                    with open(single_file_path, "rb") as f:
+                        st.download_button(f"Tải Tập {ep_num} về máy", f, file_name=f"Phim_{m_id}_Tap_{ep_num:03d}.mp4", mime="video/mp4")
+                else:
+                    status_text.text("Đang nén file ZIP...")
+                    zip_path = f"Phim_{m_id}.zip"
+                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                        for root, _, files in os.walk(out_dir):
+                            for file in files:
+                                zipf.write(os.path.join(root, file), arcname=file)
+                                
+                    st.success("Tải hoàn tất!")
+                    with open(zip_path, "rb") as f:
+                        st.download_button("Tải File ZIP về máy", f, file_name=zip_path, mime="application/zip")
         except Exception as e:
             st.error(f"Lỗi mạng: {e}")
