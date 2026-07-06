@@ -104,10 +104,10 @@ def get_auth_headers(token=DEFAULT_TOKEN):
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_cached_api(url, params, _headers):
-    # Dùng _headers để tránh Streamlit hash lỗi dictionary
+def fetch_cached_api(url, params, _headers, proxy_url):
     import requests
-    return requests.get(url, params=params, headers=_headers, timeout=30, verify=False).json()
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+    return requests.get(url, params=params, headers=_headers, proxies=proxies, timeout=30, verify=False).json()
 
 def get_guest_headers():
     return {
@@ -192,7 +192,7 @@ elif st.session_state.view_mode == "detail":
             # 1. Lấy tổng số tập phim
             total_eps_params = {"series_id": int(m_id)}
             total_eps_params["sign"] = generate_sign(total_eps_params, USER_ID)
-            r_total = fetch_cached_api(f"{BASE_API}/video/total_episodes", total_eps_params, headers)
+            r_total = fetch_cached_api(f"{BASE_API}/video/total_episodes", total_eps_params, headers, proxy)
             
             if r_total.get("code") == 200:
                 total_episodes = r_total.get("data", {}).get("total_episodes", 0)
@@ -200,7 +200,7 @@ elif st.session_state.view_mode == "detail":
                 # Lấy thêm thông tin giờ cập nhật
                 detail_params = {"timestamp": int(time.time()), "user_id": USER_ID}
                 detail_params["sign"] = generate_sign(detail_params, USER_ID)
-                r_detail = fetch_cached_api(f"{BASE_API}/series/detail/{m_id}", detail_params, headers)
+                r_detail = fetch_cached_api(f"{BASE_API}/series/detail/{m_id}", detail_params, headers, proxy)
                 update_time = r_detail.get("data", {}).get("daily_update_time", "N/A") if r_detail.get("code") == 200 else "N/A"
                 
                 st.info(f"Tổng cộng: {total_episodes} tập | Giờ cập nhật: {update_time}")
@@ -224,7 +224,7 @@ elif st.session_state.view_mode == "detail":
                     # 2. Gọi API lấy đúng danh sách tập của trang hiện tại
                     list_params = {"series_id": int(m_id), "start_episode": start_episode, "end_episode": end_episode}
                     list_params["sign"] = generate_sign(list_params, USER_ID)
-                    r_list = fetch_cached_api(f"{BASE_API}/video/v2/list", list_params, headers)
+                    r_list = fetch_cached_api(f"{BASE_API}/video/v2/list", list_params, headers, proxy)
                     
                     if r_list.get("code") in [0, 200] and "data" in r_list:
                         batch_eps = r_list["data"].get("list", [])
@@ -310,9 +310,8 @@ elif st.session_state.view_mode == "detail":
                         if not ts_links: continue
                         
                         def download_ts(i, ts_url, aes_key, aes_iv):
-                            import requests
                             try:
-                                ts_res = requests.get(ts_url, headers=headers, timeout=30, verify=False)
+                                ts_res = session.get(ts_url, headers=headers, timeout=30, verify=False)
                                 if ts_res.status_code == 200:
                                     data_ts = ts_res.content
                                     if aes_key:
