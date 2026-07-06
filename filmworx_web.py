@@ -14,19 +14,20 @@ except ImportError:
 st.set_page_config(page_title="Filmworx Downloader Web", page_icon="🎬", layout="wide")
 
 VOD_BASE_URL = "https://video-file.filmworx.cn"
-IMG_BASE_URL = "https://image.filmworx.cn"
+IMG_BASE_URL = "https://gnmj-file.filmworx.cn"
 BASE_API = "https://app.filmworx.cn/api/app"
 
 # ================= CẤU HÌNH CỦA BẠN =================
 # Cứ mỗi khi token hết hạn, ông sửa trực tiếp trên file này nhé!
-DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjIyNzIzNDksIm5ld191aWQiOjMyMTQwNzAsInBob25lIjoiMTg2NDY3MzQ2NjQiLCJhY2NvdW50X2lkIjoxOTMzMTIyOCwiZXhwIjoxNzQ1NjUxNTg4LCJtdGltZSI6MTcyOTgyOTYwNSwibmF0aW9uX2NvZGUiOiI4NiIsImxhbmciOiJ6aC1jbiJ9.N0K5D3LqKj_HtwpQ28kI1tU3yL4R7Y6j0-tJ1W7WqWg"
+DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMjcwNDY5NSIsImV4cCI6MTc4MjQ0Mjk1MX0.En2gnqW5M4NIOdx59fzZ3qgxKLrdigQcDFC9AKfIH34"
 def get_user_id(token):
     try:
         import base64, json
         payload = token.split('.')[1]
         payload += '=' * ((4 - len(payload) % 4) % 4)
-        return json.loads(base64.urlsafe_b64decode(payload)).get('uid', 2272349)
-    except: return 2272349
+        data = json.loads(base64.urlsafe_b64decode(payload))
+        return int(data.get('sub') or data.get('uid') or 22704695)
+    except: return 22704695
 
 USER_ID = get_user_id(DEFAULT_TOKEN)
 # ====================================================
