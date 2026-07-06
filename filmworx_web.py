@@ -73,7 +73,7 @@ if st.session_state.view_mode == "home":
             res = session.get(url, params=params, headers=get_auth_headers(token), timeout=15, verify=False)
             if res.status_code == 200:
                 data = res.json()
-                if data.get("code") == 0:
+                if data.get("code") in [0, 200]:
                     movies = data.get("data", {}).get("list", [])
                     
                     if not movies:
