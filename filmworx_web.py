@@ -126,7 +126,14 @@ elif st.session_state.view_mode == "detail":
                 eps = r["data"].get("list", [])
                 st.info(f"Tìm thấy {len(eps)} tập.")
                 
-                ep_range = st.text_input("Chọn tập tải (vd: 1-5, hoặc để trống tải hết)", placeholder="1-5")
+                if eps:
+                    # Tạo bảng danh sách tập để người dùng copy nếu muốn
+                    import pandas as pd
+                    df = pd.DataFrame([{"Tập": ep.get("episode", i+1), "Link M3U8": ep.get("url", "N/A")} for i, ep in enumerate(eps)])
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                ep_range = st.text_input("📥 Tải nhiều tập cùng lúc (vd: 1-5, hoặc để trống tải hết)", placeholder="1-5")
                 
                 if st.button("Bắt đầu Tải & Nén ZIP", type="primary"):
                     selected_eps = eps
