@@ -14,11 +14,12 @@ except ImportError:
 st.set_page_config(page_title="Filmworx Downloader Web", page_icon="🎬", layout="wide")
 
 VOD_BASE_URL = "https://video-file.filmworx.cn"
-IMG_BASE_URL = "https://gnmj-file.filmworx.cn"
+IMG_BASE_URL = "https://image.filmworx.cn"
 BASE_API = "https://app.filmworx.cn/api/app"
 
 # ================= CẤU HÌNH CỦA BẠN =================
-DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMjcwNDY5NSIsImV4cCI6MTc4MjQ0Mjk1MX0.En2gnqW5M4NIOdx59fzZ3qgxKLrdigQcDFC9AKfIH34"
+# Cứ mỗi khi token hết hạn, ông sửa trực tiếp trên file này nhé!
+DEFAULT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjIyNzIzNDksIm5ld191aWQiOjMyMTQwNzAsInBob25lIjoiMTg2NDY3MzQ2NjQiLCJhY2NvdW50X2lkIjoxOTMzMTIyOCwiZXhwIjoxNzQ1NjUxNTg4LCJtdGltZSI6MTcyOTgyOTYwNSwibmF0aW9uX2NvZGUiOiI4NiIsImxhbmciOiJ6aC1jbiJ9.N0K5D3LqKj_HtwpQ28kI1tU3yL4R7Y6j0-tJ1W7WqWg"
 USER_ID = 22704695
 # ====================================================
 
@@ -124,9 +125,12 @@ elif st.session_state.view_mode == "detail":
             
             if r.get("code") in [0, 200] and "data" in r:
                 eps = r["data"].get("list", [])
-                st.info(f"Tìm thấy {len(eps)} tập.")
                 
                 if eps:
+                    # Sắp xếp lại danh sách từ tập 1 -> N (vì API đôi khi trả về ngược từ N -> 1)
+                    eps = sorted(eps, key=lambda x: x.get("episode", 0))
+                    st.info(f"Tìm thấy {len(eps)} tập.")
+                    
                     # Chia thành các batch (mỗi batch 15 tập)
                     batch_size = 15
                     total_batches = (len(eps) + batch_size - 1) // batch_size
@@ -145,8 +149,16 @@ elif st.session_state.view_mode == "detail":
                         
                         # Tạo bảng danh sách tập để người dùng copy nếu muốn
                         import pandas as pd
-                        df = pd.DataFrame([{"Tập": ep.get("episode", start_idx+i+1), "Link M3U8": ep.get("url", "N/A")} for i, ep in enumerate(batch_eps)])
+                        df = pd.DataFrame([
+                            {
+                                "Tập": ep.get("episode", start_idx+i+1), 
+                                "Link M3U8": f"{VOD_BASE_URL}{ep.get('video_url', '')}" if ep.get("video_url") else "N/A"
+                            } 
+                            for i, ep in enumerate(batch_eps)
+                        ])
                         st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.warning("Không lấy được tập phim nào. Hãy thử tải lại trang.")
                 
                 st.markdown("---")
                 ep_range = st.text_input("📥 Chọn tập tải (vd: 1-5, hoặc để trống sẽ tải toàn bộ batch đang hiển thị ở trên)", placeholder="Ví dụ: 1-5")
